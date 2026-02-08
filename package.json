@@ -1,19 +1,57 @@
 {
   "name": "@videoml/player",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.0.0-semantic-release",
+  "description": "VideoML web player (React component + custom element) for previewing VML.",
+  "license": "MIT",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./react": "./src/react.tsx"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VideoML/player.git"
   },
   "dependencies": {
-    "@videoml/stdlib": "file:../videoml-stdlib"
+    "@videoml/stdlib": "file:../stdlib"
   },
   "peerDependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^12.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^10.0.0",
+    "@semantic-release/npm": "^12.0.0",
+    "@semantic-release/release-notes-generator": "^13.0.0",
+    "@types/react": "^18.3.8",
+    "@types/react-dom": "^18.3.1",
+    "semantic-release": "^24.2.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
