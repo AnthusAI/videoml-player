@@ -10,9 +10,10 @@
       }
     ],
     [
-      "@semantic-release/npm",
+      "@semantic-release/exec",
       {
-        "npmPublish": true
+        "prepareCmd": "npm version ${nextRelease.version} --no-git-tag-version && npm run build",
+        "publishCmd": "npm publish --access public --provenance"
       }
     ],
     "@semantic-release/github",
@@ -25,4 +26,3 @@
     ]
   ]
 }
-

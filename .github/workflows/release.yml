@@ -1,8 +1,8 @@
 name: Release
 
 on:
-  # Enable automatic releases once @videoml/stdlib is published on npm
-  # and this repo's dependency is switched from file:../stdlib to a semver range.
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install
@@ -35,6 +35,4 @@ jobs:
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
