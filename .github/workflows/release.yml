@@ -1,8 +1,8 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
+  # Note: this repo does not yet have npm Trusted Publishing configured.
+  # Keep releases manual until npm is configured (then re-enable push->main).
   workflow_dispatch: {}
 
 permissions:
