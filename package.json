@@ -1,6 +1,6 @@
 {
   "name": "@videoml/player",
-  "version": "0.0.0-semantic-release",
+  "version": "1.0.0",
   "description": "VideoML web player (React component + custom element) for previewing VML.",
   "license": "MIT",
   "type": "module",
