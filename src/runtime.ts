@@ -725,8 +725,9 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
 
     const sceneLocalTime = activeSceneStartSec != null ? Math.max(0, timeSec - activeSceneStartSec) : timeSec;
     const sceneLocalFrame = Math.floor(sceneLocalTime * fps);
-    const sceneDurationSec = (activeSceneStartSec != null && activeSceneEndSec != null)
-      ? activeSceneEndSec - activeSceneStartSec
+    const resolvedSceneEndSec = activeSceneEndSec ?? (activeSceneStartSec != null ? duration : null);
+    const sceneDurationSec = (activeSceneStartSec != null && resolvedSceneEndSec != null)
+      ? resolvedSceneEndSec - activeSceneStartSec
       : null;
     dispatchDomEvent(importedEl, "timeline:tick", {
       frame,
