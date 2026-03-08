@@ -682,6 +682,7 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
 
     let activeSceneId: string | null = null;
     let activeSceneStartSec: number | null = null;
+    let activeSceneEndSec: number | null = null;
     for (let i = 0; i < scenes.length; i += 1) {
       const scene = scenes[i];
       const nextScene = scenes[i + 1];
@@ -690,6 +691,7 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
       if (isActive) {
         activeSceneId = scene.id;
         activeSceneStartSec = scene.start;
+        activeSceneEndSec = end;
         scene.element.removeAttribute("data-runtime-hidden");
         scene.element.setAttribute("data-runtime-active", "true");
         (scene.element as HTMLElement).style.display = "block";
@@ -723,12 +725,16 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
 
     const sceneLocalTime = activeSceneStartSec != null ? Math.max(0, timeSec - activeSceneStartSec) : timeSec;
     const sceneLocalFrame = Math.floor(sceneLocalTime * fps);
+    const sceneDurationSec = (activeSceneStartSec != null && activeSceneEndSec != null)
+      ? activeSceneEndSec - activeSceneStartSec
+      : null;
     dispatchDomEvent(importedEl, "timeline:tick", {
       frame,
       time: timeSec,
       fps,
       sceneId: activeSceneId,
       sceneStartSec: activeSceneStartSec,
+      sceneDurationSec,
       sceneLocalTime,
       sceneLocalFrame,
     });
