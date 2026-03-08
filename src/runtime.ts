@@ -3,13 +3,28 @@ import { registerFallbackComponents, registerVideoMLComponents } from "@videoml/
 
 export type VmlPlayerOptions = {
   xml: string;
+  overlays?: string[];
   autoPlay?: boolean;
   clockMode?: "bounded" | "live";
   loop?: boolean;
+  layoutMode?: VmlLayoutMode;
   syncGroup?: string;
   onTimeUpdate?: (timeSec: number, durationSec: number) => void;
   onXmlChange?: (xml: string) => void;
   onError?: (message: string | null) => void;
+  onController?: (controller: VmlPlayerController) => void;
+};
+
+export type VmlLayoutMode = "frame" | "container";
+
+export type VmlPlayerController = {
+  play: () => void;
+  pause: () => void;
+  seek: (timeSec: number) => void;
+  getTime: () => number;
+  getDuration: () => number;
+  isPlaying: () => boolean;
+  subscribe: (fn: (timeSec: number, durationSec: number) => void) => () => void;
 };
 
 type Timeline = {
@@ -19,6 +34,8 @@ type Timeline = {
   time: number;
   start: () => void;
   stop: () => void;
+  seek: (timeSec: number) => void;
+  isRunning: () => boolean;
   subscribe: (fn: (time: number) => void) => () => void;
 };
 
@@ -58,6 +75,19 @@ const createTimeline = (id: string, fps: number, clockMode: "bounded" | "live", 
   let frame = 0;
   let time = 0;
   const subs = new Set<(t: number) => void>();
+  const clampSeekTime = (value: number) => {
+    const next = Number.isFinite(value) ? value : 0;
+    const floored = Math.max(0, next);
+    if (clockMode === "bounded" && duration != null) {
+      return Math.min(floored, duration);
+    }
+    return floored;
+  };
+
+  const emit = () => {
+    frame = Math.floor(time * fps);
+    subs.forEach((fn) => fn(time));
+  };
 
   const tick = (ts: number) => {
     if (!running) return;
@@ -77,9 +107,8 @@ const createTimeline = (id: string, fps: number, clockMode: "bounded" | "live", 
       }
     }
 
-    time = nextTime;
-    frame = Math.floor(time * fps);
-    subs.forEach((fn) => fn(time));
+    time = Math.max(0, nextTime);
+    emit();
     if (running) {
       raf = requestAnimationFrame(tick);
     }
@@ -105,6 +134,14 @@ const createTimeline = (id: string, fps: number, clockMode: "bounded" | "live", 
       if (raf != null) cancelAnimationFrame(raf);
       raf = null;
       lastTs = null;
+    },
+    seek(timeSec) {
+      time = clampSeekTime(timeSec);
+      lastTs = null;
+      emit();
+    },
+    isRunning() {
+      return running;
     },
     subscribe(fn) {
       subs.add(fn);
@@ -168,6 +205,30 @@ const dispatchDomEvent = (root: HTMLElement, name: string, detail: Record<string
   root.dispatchEvent(event);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+};
+
+/**
+ * Apply XML overlays to a parsed source document. Each overlay is a VideoML XML
+ * string containing elements with `id` attributes. For every element with an `id`
+ * in the overlay, the corresponding element in the source document receives all of
+ * the overlay element's attributes (except `id` itself). Overlays are applied in
+ * order; later overlays win.
+ */
+const applyOverlays = (root: Element, overlayXmls: string[]): void => {
+  for (const overlayXml of overlayXmls) {
+    const overlayDoc = new DOMParser().parseFromString(overlayXml, "text/html");
+    const allOverlayEls = overlayDoc.querySelectorAll("[id]");
+    for (const overlayEl of Array.from(allOverlayEls)) {
+      const id = overlayEl.getAttribute("id");
+      if (!id) continue;
+      const target = root.querySelector(`[id="${CSS.escape(id)}"]`);
+      if (!target) continue;
+      for (const attr of Array.from(overlayEl.attributes)) {
+        if (attr.name === "id") continue;
+        target.setAttribute(attr.name, attr.value);
+      }
+    }
   }
 };
 
@@ -326,10 +387,24 @@ const elementDuration = (el: Element, fps: number): number | null => {
   return maxDur;
 };
 
-const computeSceneTimings = (xml: string, root: Element): { scenes: SceneTiming[]; cues: CueTiming[]; duration: number | null; fps: number } => {
+const computeSceneTimings = (
+  xml: string,
+  root: Element,
+): {
+  scenes: SceneTiming[];
+  cues: CueTiming[];
+  duration: number | null;
+  fps: number;
+  frameWidth: number;
+  frameHeight: number;
+} => {
   const videoSpec = executeVomXml(xml, undefined, false);
   const composition = videoSpec?.compositions?.[0];
   const fps = composition?.meta?.fps ?? 30;
+  const metaWidth = composition?.meta?.width;
+  const metaHeight = composition?.meta?.height;
+  const frameWidth = Number.isFinite(metaWidth) && metaWidth > 0 ? Number(metaWidth) : 1280;
+  const frameHeight = Number.isFinite(metaHeight) && metaHeight > 0 ? Number(metaHeight) : 720;
   const sceneElements = Array.from(root.querySelectorAll("scene"));
   const timing: SceneTiming[] = [];
   const cueTiming: CueTiming[] = [];
@@ -379,19 +454,22 @@ const computeSceneTimings = (xml: string, root: Element): { scenes: SceneTiming[
       duration = scene.end;
     }
   }
-  return { scenes: timing, cues: cueTiming, duration, fps };
+  return { scenes: timing, cues: cueTiming, duration, fps, frameWidth, frameHeight };
 };
 
 export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions): () => void {
   const {
     xml,
+    overlays,
     autoPlay = true,
     clockMode = "live",
     loop = false,
+    layoutMode = "frame",
     syncGroup,
     onTimeUpdate,
     onXmlChange,
     onError,
+    onController,
   } = options;
 
   const timelineId = syncGroup ?? `timeline-${Math.random().toString(36).slice(2)}`;
@@ -399,6 +477,20 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
   registerVideoMLComponents();
   container.innerHTML = "";
   onError?.(null);
+  if (!container.style.position) {
+    container.style.position = "relative";
+  }
+
+  const viewportEl = document.createElement("div");
+  Object.assign(viewportEl.style, {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+    display: "block",
+  });
+  container.appendChild(viewportEl);
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "text/html");
@@ -409,14 +501,69 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
   }
 
   let imported = document.importNode(root, true) as Element;
+
+  // Map non-hyphenated standard VML tags to their video-* custom element counterparts
+  const mapTags: Record<string, string> = {
+    "title": "video-title",
+    "subtitle": "video-subtitle",
+    "rectangle": "video-rectangle",
+    "background": "video-background",
+    "callout": "video-callout",
+    "chyron": "video-chyron"
+  };
+
+  const elementsToReplace = Array.from(imported.querySelectorAll(Object.keys(mapTags).join(",")));
+  for (const el of elementsToReplace) {
+    const tagName = el.tagName.toLowerCase();
+    const newTagName = mapTags[tagName];
+    if (newTagName) {
+      const newEl = document.createElement(newTagName);
+      // Copy attributes
+      Array.from(el.attributes).forEach(attr => newEl.setAttribute(attr.name, attr.value));
+      // Copy children
+      while (el.firstChild) {
+        newEl.appendChild(el.firstChild);
+      }
+      el.parentElement?.replaceChild(newEl, el);
+    }
+  }
+
   registerFallbackComponents(imported);
-  container.appendChild(imported);
   if (!(imported instanceof HTMLElement)) {
     const wrapper = document.createElement("div");
     wrapper.appendChild(imported);
     imported = wrapper;
   }
   const importedEl = imported as HTMLElement;
+  if (overlays?.length) {
+    applyOverlays(importedEl, overlays);
+  }
+
+  let { scenes, cues, duration, fps, frameWidth, frameHeight } = computeSceneTimings(xml, importedEl);
+
+  const normalizedLayoutMode: VmlLayoutMode = layoutMode === "container" ? "container" : "frame";
+  const stageEl = normalizedLayoutMode === "frame" ? document.createElement("div") : viewportEl;
+
+  if (normalizedLayoutMode === "frame") {
+    Object.assign(stageEl.style, {
+      position: "absolute",
+      left: "0",
+      top: "0",
+      width: `${frameWidth}px`,
+      height: `${frameHeight}px`,
+      transformOrigin: "top left",
+      display: "block",
+    });
+    viewportEl.appendChild(stageEl);
+  } else {
+    Object.assign(stageEl.style, {
+      width: "100%",
+      height: "100%",
+      display: "block",
+    });
+  }
+  stageEl.appendChild(importedEl);
+
   const docRoot = document.documentElement;
   const themeAttr = docRoot.getAttribute("data-theme");
   if (themeAttr) {
@@ -428,7 +575,43 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
     importedEl.classList.remove("dark");
   }
 
-  const { scenes, cues, duration, fps } = computeSceneTimings(xml, importedEl);
+  let layoutRaf: number | null = null;
+  const applyFrameLayout = () => {
+    if (normalizedLayoutMode !== "frame") return;
+    const rect = container.getBoundingClientRect();
+    if (!(rect.width > 0) || !(rect.height > 0)) return;
+    const scale = Math.min(rect.width / frameWidth, rect.height / frameHeight);
+    const offsetX = (rect.width - frameWidth * scale) / 2;
+    const offsetY = (rect.height - frameHeight * scale) / 2;
+    stageEl.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  };
+  const scheduleLayout = () => {
+    if (layoutRaf != null) return;
+    layoutRaf = requestAnimationFrame(() => {
+      layoutRaf = null;
+      applyFrameLayout();
+    });
+  };
+
+  let disconnectLayoutObserver: (() => void) | null = null;
+  if (normalizedLayoutMode === "frame") {
+    applyFrameLayout();
+    if (typeof ResizeObserver !== "undefined") {
+      const resizeObserver = new ResizeObserver(() => scheduleLayout());
+      resizeObserver.observe(container);
+      disconnectLayoutObserver = () => {
+        resizeObserver.disconnect();
+      };
+    } else if (typeof window !== "undefined") {
+      const onResize = () => scheduleLayout();
+      window.addEventListener("resize", onResize);
+      disconnectLayoutObserver = () => {
+        window.removeEventListener("resize", onResize);
+      };
+    }
+    scheduleLayout();
+  }
+
   const timedByScene = new Map<string, TimedElement[]>();
   for (const scene of scenes) {
     const list = computeTimedElements(scene.element, scene.start, fps);
@@ -498,6 +681,7 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
     importedEl.style.setProperty("--video-fps", `${fps}`);
 
     let activeSceneId: string | null = null;
+    let activeSceneStartSec: number | null = null;
     for (let i = 0; i < scenes.length; i += 1) {
       const scene = scenes[i];
       const nextScene = scenes[i + 1];
@@ -505,6 +689,7 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
       const isActive = timeSec >= scene.start && (end == null || timeSec < end);
       if (isActive) {
         activeSceneId = scene.id;
+        activeSceneStartSec = scene.start;
         scene.element.removeAttribute("data-runtime-hidden");
         scene.element.setAttribute("data-runtime-active", "true");
         (scene.element as HTMLElement).style.display = "block";
@@ -536,7 +721,17 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
       }
     }
 
-    dispatchDomEvent(importedEl, "timeline:tick", { frame, time: timeSec, fps });
+    const sceneLocalTime = activeSceneStartSec != null ? Math.max(0, timeSec - activeSceneStartSec) : timeSec;
+    const sceneLocalFrame = Math.floor(sceneLocalTime * fps);
+    dispatchDomEvent(importedEl, "timeline:tick", {
+      frame,
+      time: timeSec,
+      fps,
+      sceneId: activeSceneId,
+      sceneStartSec: activeSceneStartSec,
+      sceneLocalTime,
+      sceneLocalFrame,
+    });
 
     for (const cue of cues) {
       const cueEnd = cue.end;
@@ -565,6 +760,23 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
   };
 
   const unsubscribe = timeline.subscribe(handleTick);
+  handleTick(timeline.time);
+
+  const controller: VmlPlayerController = {
+    play: () => timeline.start(),
+    pause: () => timeline.stop(),
+    seek: (timeSec) => timeline.seek(timeSec),
+    getTime: () => timeline.time,
+    getDuration: () => duration ?? 0,
+    isPlaying: () => timeline.isRunning(),
+    subscribe: (fn) => {
+      const wrapped = (timeSec: number) => fn(timeSec, duration ?? 0);
+      const unsub = timeline.subscribe(wrapped);
+      wrapped(timeline.time);
+      return unsub;
+    },
+  };
+  onController?.(controller);
 
   let observerRaf: number | null = null;
   let pendingSerialize = false;
@@ -609,6 +821,8 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
     unsubscribe();
     observer.disconnect();
     if (observerRaf != null) cancelAnimationFrame(observerRaf);
-    if (autoPlay) timeline.stop();
+    if (layoutRaf != null) cancelAnimationFrame(layoutRaf);
+    disconnectLayoutObserver?.();
+    timeline.stop();
   };
 }
