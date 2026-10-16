@@ -1,4 +1,13 @@
-Read and follow **AGENT_INSTRUCTIONS.md** in the root of this project (this folder). The repository root's AGENTS.md states that all sub-projects use Beads for task management.
+## Project management with Kanbus
+
+Use Kanbus for task management.
+Why: Kanbus task management is MANDATORY here; every task must live in Kanbus.
+When: Create/update the Kanbus task before coding; close it only after the change lands.
+How: See CONTRIBUTING_AGENT.md for the Kanbus workflow, hierarchy, status rules, priorities, command examples, and the sins to avoid. Never inspect project/ or issue JSON directly (including with cat or jq); use Kanbus commands only.
+Performance: Prefer kanbusr (Rust) when available; kanbus (Python) is equivalent but slower.
+Warning: Editing project/ directly is a sin against The Way. Do not read or write anything in project/; work only through Kanbus.
+
+Read and follow **AGENT_INSTRUCTIONS.md** in the root of this project (this folder) for development guidelines. Task tracking uses Kanbus, not Beads; ignore any Beads (`bd`) instructions there.
 
 ## Landing the Plane (Session Completion)
 
@@ -12,7 +21,6 @@ Read and follow **AGENT_INSTRUCTIONS.md** in the root of this project (this fold
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
