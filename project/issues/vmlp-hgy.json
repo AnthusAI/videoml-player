@@ -3,21 +3,33 @@
   "title": "Plan and add TransportControls and player-with-transport",
   "description": "Plan and implement TransportControls (play, pause, reset, seek, time display) and a player-with-transport component in a clean way. The Player package should be the core video library: drop on a page and get full transport. Keep VideomlDomPlayer as headless primitive. Use Storybook to design the controls. See player/DESIGN.md.",
   "type": "task",
-  "status": "in_progress",
+  "status": "closed",
   "priority": 2,
   "assignee": null,
   "creator": "Ryan Alyn Porter",
   "parent": null,
   "labels": [],
   "dependencies": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "61ea20b3-a8f4-43c3-befa-d4bbc6f97e3f",
+      "author": "unknown",
+      "text": "Extracted TransportControls (play/pause, reset, frame-stepped scrubber, clock or seconds readout, optional frame number, overlay/bar appearance, trailing slot) as an exported component; VideomlPlayer now renders it. Added controller.getFramesPerSecond() and Storybook stories.",
+      "created_at": "2026-10-16T23:45:22.709452Z",
+      "comment_type": "default",
+      "data": {},
+      "agent": null
+    }
+  ],
   "created_at": "2026-02-10T02:49:42.439102Z",
-  "updated_at": "2026-02-10T03:42:05.112373Z",
-  "closed_at": null,
+  "updated_at": "2026-10-16T23:45:27.667771Z",
+  "closed_at": "2026-10-16T23:45:27.667586Z",
   "right_now_summary": null,
   "right_now_updated_at": null,
   "custom": {
-    "beads_owner": "rap@endymion.com"
+    "beads_owner": "rap@endymion.com",
+    "source": "shared",
+    "project_label": "vmlp"
   },
   "agent": null,
   "agent_assignment": null

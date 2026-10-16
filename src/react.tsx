@@ -1,9 +1,18 @@
+"use client";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   mountVmlPlayer,
   type VmlPlayerController,
   type VmlPlayerOptions,
 } from "./runtime.js";
+import {
+  TransportControls,
+  type TransportControlsAppearance,
+  type TransportTimeDisplayFormat,
+} from "./transport-controls.js";
+
+export * from "./transport-controls.js";
 
 export type VideomlDomPlayerProps = Omit<VmlPlayerOptions, "onError"> & {
   width?: number;
@@ -93,6 +102,10 @@ export type VideomlTransportOptions = {
   mode?: "overlay-autohide" | "always";
   autoHideMs?: number;
   keyboardShortcuts?: boolean;
+  appearance?: TransportControlsAppearance;
+  showResetButton?: boolean;
+  showFrameNumber?: boolean;
+  timeDisplayFormat?: TransportTimeDisplayFormat;
 };
 
 export type VideomlPlayerProps = Omit<VideomlDomPlayerProps, "onController"> & {
@@ -101,45 +114,27 @@ export type VideomlPlayerProps = Omit<VideomlDomPlayerProps, "onController"> & {
   onController?: (controller: VmlPlayerController) => void;
 };
 
-type NormalizedTransport = {
-  enabled: boolean;
-  mode: "overlay-autohide" | "always";
-  autoHideMs: number;
-  keyboardShortcuts: boolean;
+type NormalizedTransport = Required<VideomlTransportOptions> & { enabled: boolean };
+
+const defaultTransportOptions: Required<VideomlTransportOptions> = {
+  mode: "overlay-autohide",
+  autoHideMs: 1600,
+  keyboardShortcuts: true,
+  appearance: "overlay",
+  showResetButton: true,
+  showFrameNumber: false,
+  timeDisplayFormat: "clock",
 };
 
 const normalizeTransport = (
   transport: boolean | VideomlTransportOptions | undefined,
 ): NormalizedTransport => {
-  if (transport === false) {
-    return {
-      enabled: false,
-      mode: "overlay-autohide",
-      autoHideMs: 1600,
-      keyboardShortcuts: true,
-    };
-  }
-  if (transport === true || transport == null) {
-    return {
-      enabled: true,
-      mode: "overlay-autohide",
-      autoHideMs: 1600,
-      keyboardShortcuts: true,
-    };
-  }
-  return {
-    enabled: true,
-    mode: transport.mode ?? "overlay-autohide",
-    autoHideMs: transport.autoHideMs ?? 1600,
-    keyboardShortcuts: transport.keyboardShortcuts ?? true,
-  };
-};
-
-const formatClock = (seconds: number) => {
-  const safe = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
-  const mins = Math.floor(safe / 60);
-  const secs = Math.floor(safe % 60);
-  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  if (transport === false) return { ...defaultTransportOptions, enabled: false };
+  if (transport === true || transport == null) return { ...defaultTransportOptions, enabled: true };
+  const explicitlyProvidedOptions = Object.fromEntries(
+    Object.entries(transport).filter(([, optionValue]) => optionValue !== undefined),
+  ) as VideomlTransportOptions;
+  return { ...defaultTransportOptions, ...explicitlyProvidedOptions, enabled: true };
 };
 
 export function VideomlPlayer({
@@ -163,6 +158,7 @@ export function VideomlPlayer({
   const [controller, setController] = useState<VmlPlayerController | null>(null);
   const [timeSec, setTimeSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
+  const [framesPerSecond, setFramesPerSecond] = useState(30);
   const [isPlaying, setIsPlaying] = useState(Boolean(autoPlay));
   const [controlsVisible, setControlsVisible] = useState(true);
 
@@ -208,6 +204,7 @@ export function VideomlPlayer({
       setTimeSec(time);
       setDurationSec(duration);
       setIsPlaying(controller.isPlaying());
+      setFramesPerSecond(controller.getFramesPerSecond());
       onTimeUpdate?.(time, duration);
     });
     return unsubscribe;
@@ -290,6 +287,14 @@ export function VideomlPlayer({
     showTransport();
   }, [controller, showTransport]);
 
+  const resetToStart = useCallback(() => {
+    if (!controller) return;
+    controller.pause();
+    if (audioRef.current) audioRef.current.pause();
+    setIsPlaying(false);
+    seekTo(0);
+  }, [controller, seekTo]);
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!transportConfig.enabled || !transportConfig.keyboardShortcuts || !controller) return;
     if (event.key === " " || event.key === "k" || event.key === "K") {
@@ -370,58 +375,30 @@ export function VideomlPlayer({
       />
 
       {transportConfig.enabled ? (
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: "10px 12px 12px",
-            display: showControls ? "flex" : "none",
-            alignItems: "center",
-            gap: 10,
-            background: "linear-gradient(to top, rgba(0,0,0,0.76), rgba(0,0,0,0.18), transparent)",
-            color: "#e5e7eb",
-            pointerEvents: "auto",
-          }}
-        >
-          <button
-            type="button"
-            onClick={togglePlay}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.24)",
-              background: "rgba(17,24,39,0.72)",
-              color: "#f9fafb",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              lineHeight: 1,
-            }}
-          >
-            {isPlaying ? "❚❚" : "▶"}
-          </button>
-          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, minWidth: 42 }}>
-            {formatClock(timeSec)}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0.001, durationSec)}
-            step={0.01}
-            value={Math.min(timeSec, Math.max(0.001, durationSec))}
-            onChange={(event) => seekTo(Number(event.target.value))}
-            onInput={showTransport}
-            style={{ flex: 1, cursor: "pointer" }}
-          />
-          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, minWidth: 42, textAlign: "right" }}>
-            {formatClock(durationSec)}
-          </span>
-        </div>
+        <TransportControls
+          isPlaying={isPlaying}
+          currentTimeSec={timeSec}
+          durationSec={durationSec}
+          framesPerSecond={framesPerSecond}
+          onTogglePlayback={togglePlay}
+          onSeek={seekTo}
+          onReset={transportConfig.showResetButton ? resetToStart : undefined}
+          showFrameNumber={transportConfig.showFrameNumber}
+          timeDisplayFormat={transportConfig.timeDisplayFormat}
+          appearance={transportConfig.appearance}
+          disabled={!controller}
+          style={
+            transportConfig.appearance === "bar"
+              ? undefined
+              : {
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: showControls ? "flex" : "none",
+                }
+          }
+        />
       ) : null}
     </div>
   );
