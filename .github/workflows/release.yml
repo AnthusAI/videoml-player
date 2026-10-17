@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  # Note: this repo does not yet have npm Trusted Publishing configured.
-  # Keep releases manual until npm is configured (then re-enable push->main).
+  # Requires an npm Trusted Publisher for @videoml/player pointing at this
+  # repository and the release.yml workflow. Re-enable push->main once a
+  # manual release has succeeded.
   workflow_dispatch: {}
 
 permissions:
@@ -25,6 +26,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@^11.5.1
 
       - name: Install
         run: npm ci
