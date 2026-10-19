@@ -1,0 +1,31 @@
+{
+  "id": "vmlp-04b",
+  "title": "Replace all Babulus studio-web players with VideoML standard player",
+  "description": "After TransportControls and player-with-transport exist in VideoML Player: replace every player in Babulus apps/studio-web that currently has transport controls (e.g. PreviewPlayer and its usages in PreviewEmbed, DocsPreviewPlayer, video-editor, studio-workspace) with the standard VideoML player so Babulus consumes the core library instead of its own control bar. Depends on vmlp-hgy.",
+  "type": "task",
+  "status": "open",
+  "priority": 2,
+  "assignee": null,
+  "creator": "Ryan Alyn Porter",
+  "parent": null,
+  "labels": [],
+  "dependencies": [
+    {
+      "target": "vmlp-hgy",
+      "type": "blocked-by"
+    }
+  ],
+  "comments": [],
+  "created_at": "2026-02-10T02:49:52.307290Z",
+  "updated_at": "2026-10-16T18:03:10.683424Z",
+  "closed_at": null,
+  "right_now_summary": null,
+  "right_now_updated_at": null,
+  "custom": {
+    "beads_owner": "rap@endymion.com",
+    "source": "shared",
+    "project_label": "vmlp"
+  },
+  "agent": null,
+  "agent_assignment": null
+}

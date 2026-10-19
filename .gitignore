@@ -11,5 +11,5 @@ pnpm-debug.log*
 # Claude / agent tooling
 .claude/
 
-# Kanbus project data
-project/
+# Kanbus local overlay cache
+project/.overlay/
