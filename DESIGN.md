@@ -14,20 +14,21 @@ The industry term for the control bar (play, pause, reset/rewind, seek, time dis
 So:
 
 - **VideomlDomPlayer** = headless playback (VML XML → DOM + timeline). No UI controls.
-- **TransportControls** = the controls component (to be implemented).
+- **TransportControls** = the controls component, usable on its own with any playback source.
 - **Player with transport** = VideomlDomPlayer + TransportControls, so embedders get a complete “video on the page” experience by default.
 
 ## Current state
 
 - **VideomlDomPlayer** (React) and **&lt;vml-player&gt;** (web component): headless playback primitive.
-- **VideomlPlayer** (React): reference player with built-in transport controls.
+- **TransportControls** (React): presentational transport bar. It owns no clock; the host passes `isPlaying`, `currentTimeSec`, `durationSec` and handlers (`onTogglePlayback`, `onSeek`, optional `onReset`). Options: `framesPerSecond` (scrubber steps by one frame), `showFrameNumber`, `timeDisplayFormat` (`"clock"` or `"seconds"`), `appearance` (`"overlay"` or `"bar"`), `trailingContent` for host buttons such as exit-fullscreen, plus `className`/`style`. Products with their own renderer (for example Babulus's ScriptData preview) can use it instead of a bespoke control bar.
+- **VideomlPlayer** (React): reference player with built-in transport controls, rendered with `TransportControls`.
   - `layoutMode`: `"frame"` (default) or `"container"`.
     - `"frame"` locks scene CSS/layout to composition dimensions (for example 1920x1080) and scales the full stage to fit.
     - `"container"` keeps legacy behavior where scene layout resolves directly against container pixels.
-  - `transport`: `true | false | { mode?: "overlay-autohide" | "always"; autoHideMs?: number; keyboardShortcuts?: boolean }`
+  - `transport`: `true | false | { mode?: "overlay-autohide" | "always"; autoHideMs?: number; keyboardShortcuts?: boolean; appearance?: "overlay" | "bar"; showResetButton?: boolean; showFrameNumber?: boolean; timeDisplayFormat?: "clock" | "seconds" }`. The `"bar"` appearance renders below the stage instead of over it.
   - `audioSrc`: optional audio track used as playback clock source for synchronized scrubbing/playback.
-- **Runtime controller API**: `onController` provides `play/pause/seek/getTime/getDuration/isPlaying/subscribe`.
-- **Storybook**: includes headless and transport-enabled variants.
+- **Runtime controller API**: `onController` provides `play/pause/seek/getTime/getDuration/getFramesPerSecond/isPlaying/subscribe`.
+- **Storybook**: includes headless and transport-enabled player variants, and standalone `TransportControls` stories.
 
 ## Direction
 

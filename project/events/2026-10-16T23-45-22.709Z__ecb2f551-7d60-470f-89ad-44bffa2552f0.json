@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "event_id": "ecb2f551-7d60-470f-89ad-44bffa2552f0",
+  "issue_id": "vmlp-hgy",
+  "event_type": "comment_added",
+  "occurred_at": "2026-10-16T23:45:22.709Z",
+  "actor_id": "unknown",
+  "payload": {
+    "comment_id": "61ea20b3-a8f4-43c3-befa-d4bbc6f97e3f",
+    "comment_author": "unknown"
+  }
+}

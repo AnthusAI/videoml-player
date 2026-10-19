@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "event_id": "e77dcc4b-3eb3-466c-ac3c-cdb29519368b",
+  "issue_id": "vmlp-hgy",
+  "event_type": "state_transition",
+  "occurred_at": "2026-10-16T23:45:27.667Z",
+  "actor_id": "unknown",
+  "payload": {
+    "from_status": "in_progress",
+    "to_status": "closed"
+  }
+}

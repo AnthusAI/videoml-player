@@ -23,6 +23,7 @@ export type VmlPlayerController = {
   seek: (timeSec: number) => void;
   getTime: () => number;
   getDuration: () => number;
+  getFramesPerSecond: () => number;
   isPlaying: () => boolean;
   subscribe: (fn: (timeSec: number, durationSec: number) => void) => () => void;
 };
@@ -775,6 +776,7 @@ export function mountVmlPlayer(container: HTMLElement, options: VmlPlayerOptions
     seek: (timeSec) => timeline.seek(timeSec),
     getTime: () => timeline.time,
     getDuration: () => duration ?? 0,
+    getFramesPerSecond: () => fps,
     isPlaying: () => timeline.isRunning(),
     subscribe: (fn) => {
       const wrapped = (timeSec: number) => fn(timeSec, duration ?? 0);
